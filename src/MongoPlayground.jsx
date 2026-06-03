@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './MongoPlayground.css';
 
 export default function MongoPlayground() {
@@ -7,6 +7,28 @@ export default function MongoPlayground() {
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [dbStatus, setDbStatus] = useState('checking'); // 'checking', 'connected', 'error'
+
+  // Ping the database on component mount to check connection
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        const response = await fetch('/api/execute-sql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: '{"ping": 1}' }),
+        });
+        if (response.ok) {
+          setDbStatus('connected');
+        } else {
+          setDbStatus('error');
+        }
+      } catch (err) {
+        setDbStatus('error');
+      }
+    };
+    checkConnection();
+  }, []);
 
   const runQuery = async () => {
     setIsLoading(true);
@@ -113,7 +135,15 @@ export default function MongoPlayground() {
   return (
     <div className="mongo-playground dark-theme">
       <div className="header">
-        <h2>MongoDB Playground</h2>
+        <div className="header-title-row">
+          <h2>MongoDB Playground</h2>
+          <div className={`status-badge ${dbStatus}`}>
+            <span className="status-dot"></span>
+            {dbStatus === 'checking' && 'Checking Connection...'}
+            {dbStatus === 'connected' && 'Connected'}
+            {dbStatus === 'error' && 'Connection Error'}
+          </div>
+        </div>
         <p>Run live JSON commands against your MongoDB instance. Read-only access.</p>
       </div>
       

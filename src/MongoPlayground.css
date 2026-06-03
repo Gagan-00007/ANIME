@@ -33,12 +33,58 @@
   margin-bottom: 1.5rem;
 }
 
-.header h2 {
-  margin: 0 0 0.5rem 0;
+.header-title-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.header-title-row h2 {
+  margin: 0;
+  font-size: 24px;
   font-weight: 600;
-  font-size: 1.75rem;
-  color: #ffffff;
-  letter-spacing: -0.02em;
+  color: var(--accent-primary);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-badge.checking .status-dot {
+  background-color: #fbbf24;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.5);
+  animation: pulse 1.5s infinite;
+}
+
+.status-badge.connected .status-dot {
+  background-color: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+.status-badge.error .status-dot {
+  background-color: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
 }
 
 .header p {

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import './SqlPlayground.css';
+import './MongoPlayground.css';
 
-export default function SqlPlayground() {
-  const [query, setQuery] = useState('SELECT * FROM users\nORDER BY created_at DESC');
+export default function MongoPlayground() {
+  // A valid JSON default query
+  const [query, setQuery] = useState('{\n  "find": "users",\n  "limit": 10\n}');
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -11,6 +12,15 @@ export default function SqlPlayground() {
     setIsLoading(true);
     setError(null);
     setResults(null);
+
+    // Validate if it is valid JSON before sending
+    try {
+      JSON.parse(query);
+    } catch (e) {
+      setError("Invalid JSON: " + e.message);
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const response = await fetch('/api/execute-sql', {
@@ -46,51 +56,65 @@ export default function SqlPlayground() {
     if (!results || results.length === 0) {
       return (
         <div className="empty-state">
-          Query executed successfully but returned no results.
+          Command executed successfully but returned no results.
         </div>
       );
     }
 
-    const headers = Object.keys(results[0]);
+    // Try to build a table if the result is an array of documents
+    if (Array.isArray(results) && results.length > 0 && typeof results[0] === 'object') {
+      // Get all unique keys across all documents to form headers
+      const headerSet = new Set();
+      results.forEach(doc => Object.keys(doc).forEach(key => headerSet.add(key)));
+      const headers = Array.from(headerSet);
 
-    return (
-      <div className="table-container">
-        <table className="results-table">
-          <thead>
-            <tr>
-              {headers.map((header) => (
-                <th key={header}>{header}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {results.map((row, rowIndex) => (
-              <tr key={rowIndex}>
-                {headers.map((header) => {
-                  let value = row[header];
-                  if (value === null) value = 'NULL';
-                  else if (typeof value === 'object') value = JSON.stringify(value);
-                  else value = String(value);
-
-                  return (
-                    <td key={`${rowIndex}-${header}`} className={value === 'NULL' ? 'null-value' : ''}>
-                      {value}
-                    </td>
-                  );
-                })}
+      return (
+        <div className="table-container">
+          <table className="results-table">
+            <thead>
+              <tr>
+                {headers.map((header) => (
+                  <th key={header}>{header}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {results.map((row, rowIndex) => (
+                <tr key={rowIndex}>
+                  {headers.map((header) => {
+                    let value = row[header];
+                    if (value === undefined) value = '';
+                    else if (value === null) value = 'NULL';
+                    else if (typeof value === 'object') value = JSON.stringify(value);
+                    else value = String(value);
+
+                    return (
+                      <td key={`${rowIndex}-${header}`} className={value === 'NULL' ? 'null-value' : ''}>
+                        {value}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    // If it's just a raw object (e.g. from ping command), dump as JSON
+    return (
+      <pre className="raw-json-results">
+        {JSON.stringify(results, null, 2)}
+      </pre>
     );
   };
 
   return (
-    <div className="sql-playground dark-theme">
+    <div className="mongo-playground dark-theme">
       <div className="header">
-        <h2>SQL Playground</h2>
-        <p>Run live queries against the Supabase database. Read-only access.</p>
+        <h2>MongoDB Playground</h2>
+        <p>Run live JSON commands against your MongoDB instance. Read-only access.</p>
       </div>
       
       <div className="editor-container">
@@ -98,14 +122,14 @@ export default function SqlPlayground() {
           <span className="dot red"></span>
           <span className="dot yellow"></span>
           <span className="dot green"></span>
-          <span className="toolbar-title">query.sql</span>
+          <span className="toolbar-title">query.json</span>
         </div>
         <textarea
-          className="sql-editor"
+          className="mongo-editor"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Enter your SQL query here... (Ctrl + Enter to run)"
+          placeholder="Enter your MongoDB JSON command here... (Ctrl + Enter to run)"
           spellCheck="false"
         />
         <div className="actions">
@@ -119,7 +143,7 @@ export default function SqlPlayground() {
                 <span className="spinner"></span> Running...
               </>
             ) : (
-              '▶ Run Query'
+              '▶ Run Command'
             )}
           </button>
         </div>
@@ -132,7 +156,7 @@ export default function SqlPlayground() {
             <div className="error-box">
               <div className="error-icon">⚠️</div>
               <div className="error-content">
-                <strong>Query Failed</strong>
+                <strong>Command Failed</strong>
                 <p>{error}</p>
               </div>
             </div>

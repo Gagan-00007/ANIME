@@ -42,7 +42,7 @@ async def execute_sql(request: QueryRequest):
             query = query + " LIMIT 100"
 
     # 3. Connect to Supabase
-    database_uri = os.environ.get("SUPABASE_READ_ONLY_URI")
+    database_uri = os.environ.get("SUPABASE_DB_URL")
     if not database_uri:
         raise HTTPException(status_code=500, detail="Server configuration error: Database URI missing.")
 

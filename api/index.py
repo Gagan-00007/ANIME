@@ -64,5 +64,5 @@ async def execute_sql(request: QueryRequest):
         # 5. Catch SQL syntax errors and return them safely to the frontend
         raise HTTPException(status_code=400, detail=f"SQL Error: {str(e)}")
     except Exception as e:
-        # Catch unexpected errors
-        raise HTTPException(status_code=500, detail="An internal server error occurred.")
+        # Catch unexpected errors and expose them temporarily for debugging
+        raise HTTPException(status_code=500, detail=f"Database Connection or Internal Error: {str(e)}")

@@ -2,7 +2,7 @@ import os
 import json
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import motor.motor_asyncio
+import pymongo
 
 app = FastAPI()
 
@@ -16,8 +16,12 @@ FORBIDDEN_COMMANDS = {
     "dropuser", "grantroles", "revokeroles"
 }
 
+# Keep a global client to reuse connection pools across warm serverless invocations
+client = None
+
 @app.post("/api/execute-sql")
-async def execute_mongo(request: QueryRequest):
+def execute_mongo(request: QueryRequest):
+    global client
     query_str = request.query.strip()
     
     if not query_str:
@@ -33,7 +37,6 @@ async def execute_mongo(request: QueryRequest):
         raise HTTPException(status_code=400, detail="Query must be a valid JSON object.")
 
     # 1. Security Validation: Block data-modifying commands
-    # In MongoDB, the command is usually the first key in the document
     for key in command_dict.keys():
         if key.lower() in FORBIDDEN_COMMANDS:
             raise HTTPException(
@@ -42,7 +45,6 @@ async def execute_mongo(request: QueryRequest):
             )
 
     # 2. To protect against massive data dumps, automatically append limit 100 
-    # if it's a find/aggregate command and no limit is specified.
     if "find" in command_dict and "limit" not in command_dict:
         command_dict["limit"] = 100
 
@@ -52,22 +54,19 @@ async def execute_mongo(request: QueryRequest):
         raise HTTPException(status_code=500, detail="Server configuration error: MONGODB_URI missing.")
 
     try:
-        # Establish connection
-        client = motor.motor_asyncio.AsyncIOMotorClient(mongodb_uri, serverSelectionTimeoutMS=5000)
+        # Establish connection (reuses global client if warm)
+        if client is None:
+            client = pymongo.MongoClient(mongodb_uri, serverSelectionTimeoutMS=5000)
         
-        # Get the default database (specified in the connection URI)
-        # If no default DB is provided in URI, this might fail or fallback to 'test'
         db = client.get_default_database()
         
-        # 4. Execute the raw MongoDB command
-        result = await db.command(command_dict)
+        # 4. Execute the raw MongoDB command synchronously
+        result = db.command(command_dict)
         
         # 5. Format the result to fit into the existing frontend table nicely
-        # MongoDB returns queries inside a 'cursor.firstBatch' structure
         if "cursor" in result and "firstBatch" in result["cursor"]:
             formatted_results = result["cursor"]["firstBatch"]
         else:
-            # If it's a command that doesn't return a cursor (like ping), return it as a list of 1 object
             formatted_results = [result]
             
         # Convert MongoDB ObjectId to string to prevent JSON serialization errors
@@ -80,6 +79,3 @@ async def execute_mongo(request: QueryRequest):
     except Exception as e:
         # Catch unexpected errors and expose them temporarily for debugging
         raise HTTPException(status_code=500, detail=f"MongoDB Connection or Execution Error: {str(e)}")
-    finally:
-        # Close connection
-        client.close()

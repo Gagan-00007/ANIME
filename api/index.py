@@ -94,7 +94,9 @@ def execute_sql(request: QueryRequest):
             
     # Add a limit if not present
     if "limit" not in query_str.lower():
-        query_str = f"SELECT * FROM ({query_str}) AS subquery LIMIT 100"
+        # Strip any trailing semicolons before wrapping in a subquery
+        clean_query = query_str.rstrip(";")
+        query_str = f"SELECT * FROM ({clean_query}) AS subquery LIMIT 100"
 
     database_uri = os.environ.get("DATABASE_URL")
     if not database_uri:

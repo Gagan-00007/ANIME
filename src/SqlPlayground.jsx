@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import './MongoPlayground.css';
+import './SqlPlayground.css';
 
-export default function MongoPlayground() {
-  // A valid JSON default query
-  const [query, setQuery] = useState('{\n  "find": "users",\n  "limit": 10\n}');
+export default function SqlPlayground() {
+  const [query, setQuery] = useState('SELECT * FROM my_table LIMIT 10;');
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -13,10 +12,10 @@ export default function MongoPlayground() {
   useEffect(() => {
     const checkConnection = async () => {
       try {
-        const response = await fetch('/api/execute-mongo', {
+        const response = await fetch('/api/execute-sql', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: '{"ping": 1}' }),
+          body: JSON.stringify({ query: 'SELECT 1;' }),
         });
         if (response.ok) {
           setDbStatus('connected');
@@ -35,17 +34,8 @@ export default function MongoPlayground() {
     setError(null);
     setResults(null);
 
-    // Validate if it is valid JSON before sending
     try {
-      JSON.parse(query);
-    } catch (e) {
-      setError("Invalid JSON: " + e.message);
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/execute-mongo', {
+      const response = await fetch('/api/execute-sql', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -83,60 +73,55 @@ export default function MongoPlayground() {
       );
     }
 
-    // Try to build a table if the result is an array of documents
-    if (Array.isArray(results) && results.length > 0 && typeof results[0] === 'object') {
-      // Get all unique keys across all documents to form headers
-      const headerSet = new Set();
-      results.forEach(doc => Object.keys(doc).forEach(key => headerSet.add(key)));
-      const headers = Array.from(headerSet);
-
-      return (
-        <div className="table-container">
-          <table className="results-table">
-            <thead>
-              <tr>
-                {headers.map((header) => (
-                  <th key={header}>{header}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((row, rowIndex) => (
-                <tr key={rowIndex}>
-                  {headers.map((header) => {
-                    let value = row[header];
-                    if (value === undefined) value = '';
-                    else if (value === null) value = 'NULL';
-                    else if (typeof value === 'object') value = JSON.stringify(value);
-                    else value = String(value);
-
-                    return (
-                      <td key={`${rowIndex}-${header}`} className={value === 'NULL' ? 'null-value' : ''}>
-                        {value}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      );
+    // Identify columns
+    let headers = [];
+    if (results.length > 0 && typeof results[0] === 'object') {
+      headers = Object.keys(results[0]);
+    } else if (results.length > 0) {
+      // Edge case if it returned just values
+      headers = ['value'];
+      results = results.map(v => ({ value: v }));
     }
 
-    // If it's just a raw object (e.g. from ping command), dump as JSON
     return (
-      <pre className="raw-json-results">
-        {JSON.stringify(results, null, 2)}
-      </pre>
+      <div className="table-container">
+        <table className="results-table">
+          <thead>
+            <tr>
+              {headers.map((header) => (
+                <th key={header}>{header}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {results.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {headers.map((header) => {
+                  let value = row[header];
+                  if (value === undefined) value = '';
+                  else if (value === null) value = 'NULL';
+                  else if (typeof value === 'object') value = JSON.stringify(value);
+                  else value = String(value);
+
+                  return (
+                    <td key={`${rowIndex}-${header}`} className={value === 'NULL' ? 'null-value' : ''}>
+                      {value}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     );
   };
 
   return (
-    <div className="mongo-playground dark-theme">
+    <div className="sql-playground dark-theme">
       <div className="header">
         <div className="header-title-row">
-          <h2>MongoDB Playground</h2>
+          <h2>PostgreSQL Playground</h2>
           <div className={`status-badge ${dbStatus}`}>
             <span className="status-dot"></span>
             {dbStatus === 'checking' && 'Checking Connection...'}
@@ -144,7 +129,7 @@ export default function MongoPlayground() {
             {dbStatus === 'error' && 'Connection Error'}
           </div>
         </div>
-        <p>Run live JSON commands against your MongoDB instance. Read-only access.</p>
+        <p>Run live SQL commands against your Supabase instance. Read-only access.</p>
       </div>
       
       <div className="editor-container">
@@ -152,14 +137,14 @@ export default function MongoPlayground() {
           <span className="dot red"></span>
           <span className="dot yellow"></span>
           <span className="dot green"></span>
-          <span className="toolbar-title">query.json</span>
+          <span className="toolbar-title">query.sql</span>
         </div>
         <textarea
-          className="mongo-editor"
+          className="sql-editor"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Enter your MongoDB JSON command here... (Ctrl + Enter to run)"
+          placeholder="Enter your SQL command here... (Ctrl + Enter to run)"
           spellCheck="false"
         />
         <div className="actions">

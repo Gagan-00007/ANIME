@@ -1,0 +1,187 @@
+# Advanced MongoDB Anime Queries
+
+If you want to see the true power of MongoDB as a Data Analyst, here are some "Super Queries." These go beyond basic counting and filtering. They use complex aggregations, custom math, and `$facet` multi-processing to uncover deep insights from your data.
+
+You can paste any of these directly into your MongoDB Playground!
+
+### 1. 💎 The Underrated Hidden Gems
+**Goal:** Find anime that are incredibly highly rated (Score >= 8.5) but are relatively unknown (under 50,000 members).
+```json
+{
+  "aggregate": "series",
+  "pipeline": [
+    {
+      "$match": {
+        "rating": { "$gte": 8.5 },
+        "members": { "$lt": 50000, "$gt": 0 }
+      }
+    },
+    {
+      "$project": {
+        "_id": 0,
+        "name": 1,
+        "rating": 1,
+        "members": 1,
+        "genre": 1
+      }
+    },
+    {
+      "$sort": {
+        "rating": -1
+      }
+    },
+    { "$limit": 10 }
+  ],
+  "cursor": {}
+}
+```
+
+### 2. 🎭 The "Hype vs. Reality" Check (Most Overrated Anime)
+**Goal:** Find anime that are insanely popular (over 300,000 members) but have surprisingly low scores (under 7.0). 
+```json
+{
+  "aggregate": "series",
+  "pipeline": [
+    {
+      "$match": {
+        "members": { "$gte": 300000 },
+        "rating": { "$lt": 7.0, "$gt": 0 }
+      }
+    },
+    {
+      "$project": {
+        "_id": 0,
+        "name": 1,
+        "rating": 1,
+        "members": 1,
+        "type": 1
+      }
+    },
+    {
+      "$sort": {
+        "members": -1
+      }
+    }
+  ],
+  "cursor": {}
+}
+```
+
+### 3. 🧪 The "Golden Formula" (Best Performing Exact Genre Combinations)
+**Goal:** Instead of looking at a single genre like "Action", this looks at the **exact combination of genres** (e.g., "Action, Drama, Romance") to see which specific mix guarantees the highest average rating. (Only checks combinations that have been made at least 10 times to avoid flukes).
+```json
+{
+  "aggregate": "series",
+  "pipeline": [
+    {
+      "$match": {
+        "genre": { "$ne": null },
+        "rating": { "$ne": null }
+      }
+    },
+    {
+      "$group": {
+        "_id": "$genre",
+        "average_rating": { "$avg": "$rating" },
+        "total_anime_made": { "$sum": 1 },
+        "average_popularity": { "$avg": "$members" }
+      }
+    },
+    {
+      "$match": {
+        "total_anime_made": { "$gte": 10 }
+      }
+    },
+    {
+      "$sort": {
+        "average_rating": -1
+      }
+    },
+    { "$limit": 10 },
+    {
+      "$project": {
+        "_id": 0,
+        "winning_genre_combo": "$_id",
+        "average_rating": { "$round": ["$average_rating", 2] },
+        "total_anime_made": 1
+      }
+    }
+  ],
+  "cursor": {}
+}
+```
+
+### 4. 🧮 Calculating a Custom "Binge-Worthy" Metric
+**Goal:** Uses MongoDB's powerful math operators to create a custom score! It calculates `(Rating * Members) / Episodes` to find shows that are highly rated, super popular, but don't have too many episodes (perfect for a quick weekend binge).
+```json
+{
+  "aggregate": "series",
+  "pipeline": [
+    {
+      "$match": {
+        "type": "TV",
+        "episodes": { "$gte": 12, "$lte": 26 },
+        "rating": { "$gte": 8.0 }
+      }
+    },
+    {
+      "$project": {
+        "_id": 0,
+        "name": 1,
+        "episodes": 1,
+        "rating": 1,
+        "binge_score": {
+          "$divide": [
+            { "$multiply": ["$rating", "$members"] },
+            "$episodes"
+          ]
+        }
+      }
+    },
+    {
+      "$sort": {
+        "binge_score": -1
+      }
+    },
+    { "$limit": 10 }
+  ],
+  "cursor": {}
+}
+```
+
+### 5. 🧠 The Multi-Dimensional Facet Analysis
+**Goal:** This uses `$facet`, which is a master-level MongoDB operator. It runs **three completely different analytical queries at the exact same time** and returns them as a single JSON object. It gives you an instant dashboard of your data.
+```json
+{
+  "aggregate": "series",
+  "pipeline": [
+    {
+      "$facet": {
+        "top_5_tv_shows": [
+          { "$match": { "type": "TV" } },
+          { "$sort": { "rating": -1 } },
+          { "$limit": 5 },
+          { "$project": { "_id": 0, "name": 1, "rating": 1 } }
+        ],
+        "top_5_movies": [
+          { "$match": { "type": "Movie" } },
+          { "$sort": { "rating": -1 } },
+          { "$limit": 5 },
+          { "$project": { "_id": 0, "name": 1, "rating": 1 } }
+        ],
+        "overall_statistics": [
+          {
+            "$group": {
+              "_id": null,
+              "total_anime_in_db": { "$sum": 1 },
+              "average_global_rating": { "$avg": "$rating" }
+            }
+          },
+          { "$project": { "_id": 0 } }
+        ]
+      }
+    }
+  ],
+  "cursor": {}
+}
+```

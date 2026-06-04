@@ -1,0 +1,232 @@
+# 14 Anime Database Queries (MongoDB Translations)
+
+Since your dataset contains Anime data (`name`, `genre`, `type`, `episodes`, `rating`, `members`) rather than Netflix data (dates, directors, countries), I have adapted the 14 concepts into equivalent MongoDB JSON queries that you can copy and paste directly into your **MongoDB Playground**.
+
+### 1. Count the number of Anime by Type (TV, Movie, OVA, etc.)
+*Original: Count the number of Movies vs TV Shows*
+```json
+{
+  "aggregate": "series",
+  "pipeline": [
+    { "$group": { "_id": "$type", "total_count": { "$sum": 1 } } },
+    { "$project": { "_id": 0, "type": "$_id", "total_count": 1 } },
+    { "$sort": { "total_count": -1 } }
+  ],
+  "cursor": {}
+}
+```
+
+### 2. Find the most common Rating Score for each Anime Type
+*Original: Find the most common rating for movies and TV shows*
+```json
+{
+  "aggregate": "series",
+  "pipeline": [
+    { "$group": { "_id": { "type": "$type", "rating": "$rating" }, "rating_count": { "$sum": 1 } } },
+    { "$sort": { "_id.type": 1, "rating_count": -1 } },
+    { "$group": { 
+        "_id": "$_id.type", 
+        "most_frequent_rating_score": { "$first": "$_id.rating" },
+        "total_appearances": { "$first": "$rating_count" }
+      }
+    },
+    { "$project": { "_id": 0, "type": "$_id", "most_frequent_rating_score": 1, "total_appearances": 1 } }
+  ],
+  "cursor": {}
+}
+```
+
+### 3. List all anime with exactly 12 episodes
+*Original: List all movies released in a specific year*
+```json
+{
+  "find": "series",
+  "filter": {
+    "episodes": 12
+  },
+  "limit": 20
+}
+```
+
+### 4. Find the top 5 Genres with the most anime
+*Original: Find the top 5 countries with the most content on Netflix*
+*(Note: Since genre is a string separated by commas, we use `$split` to count individual genres)*
+```json
+{
+  "aggregate": "series",
+  "pipeline": [
+    { "$project": { "genres": { "$split": ["$genre", ", "] } } },
+    { "$unwind": "$genres" },
+    { "$group": { "_id": "$genres", "total_content": { "$sum": 1 } } },
+    { "$project": { "_id": 0, "genre": "$_id", "total_content": 1 } },
+    { "$sort": { "total_content": -1 } },
+    { "$limit": 5 }
+  ],
+  "cursor": {}
+}
+```
+
+### 5. Identify the longest Anime (most episodes)
+*Original: Identify the longest movie*
+```json
+{
+  "find": "series",
+  "sort": { "episodes": -1 },
+  "limit": 5,
+  "projection": { "_id": 0, "name": 1, "type": 1, "episodes": 1 }
+}
+```
+
+### 6. Find the most popular anime based on member count
+*Original: Find content added in the last 5 years*
+```json
+{
+  "find": "series",
+  "sort": { "members": -1 },
+  "limit": 10,
+  "projection": { "_id": 0, "name": 1, "members": 1 }
+}
+```
+
+### 7. Find all Anime containing a specific keyword in the genre (e.g. Action)
+*Original: Find all the movies/TV shows by director*
+```json
+{
+  "find": "series",
+  "filter": {
+    "genre": { "$regex": "Action", "$options": "i" }
+  },
+  "limit": 10
+}
+```
+
+### 8. List all TV shows with more than 100 episodes
+*Original: List all TV shows with more than 5 seasons*
+```json
+{
+  "find": "series",
+  "filter": {
+    "type": "TV",
+    "episodes": { "$gt": 100 }
+  },
+  "sort": { "episodes": -1 },
+  "projection": { "_id": 0, "name": 1, "episodes": 1 },
+  "limit": 20
+}
+```
+
+### 9. Count the Number of Content Items in Each Genre (Full List)
+*Original: Count the Number of Content Items in Each Genre*
+```json
+{
+  "aggregate": "series",
+  "pipeline": [
+    { "$project": { "genres": { "$split": ["$genre", ", "] } } },
+    { "$unwind": "$genres" },
+    { "$group": { "_id": "$genres", "total_content": { "$sum": 1 } } },
+    { "$project": { "_id": 0, "genre": "$_id", "total_content": 1 } },
+    { "$sort": { "total_content": -1 } }
+  ],
+  "cursor": {}
+}
+```
+
+### 10. Find Top 5 Genres with the Highest Average Ratings
+*Original: Find Top 5 Years with Highest Content Releases in India*
+*(Only including genres with at least 50 anime to avoid outliers)*
+```json
+{
+  "aggregate": "series",
+  "pipeline": [
+    { "$project": { "genres": { "$split": ["$genre", ", "] }, "rating": 1 } },
+    { "$unwind": "$genres" },
+    { "$group": { "_id": "$genres", "avg_rating": { "$avg": "$rating" }, "count": { "$sum": 1 } } },
+    { "$match": { "count": { "$gte": 50 } } }, 
+    { "$sort": { "avg_rating": -1 } },
+    { "$limit": 5 },
+    { "$project": { "_id": 0, "genre": "$_id", "avg_rating": 1, "count": 1 } }
+  ],
+  "cursor": {}
+}
+```
+
+### 11. List all Movies that are in the "Historical" genre
+*Original: List all movies that are documentaries*
+```json
+{
+  "find": "series",
+  "filter": {
+    "type": "Movie",
+    "genre": { "$regex": "Historical", "$options": "i" }
+  },
+  "limit": 10,
+  "projection": { "_id": 0, "name": 1, "genre": 1 }
+}
+```
+
+### 12. Find how many Highly-Rated Popular TV shows exist
+*Original: Find how many movies actor 'Salman Khan' appeared in last 10 years*
+*(Finds the total count of TV Shows with Rating > 8.5 and Members > 100,000)*
+```json
+{
+  "aggregate": "series",
+  "pipeline": [
+    { 
+      "$match": { 
+        "type": "TV",
+        "rating": { "$gte": 8.5 },
+        "members": { "$gte": 100000 }
+      } 
+    },
+    { "$count": "total_masterpiece_shows" }
+  ],
+  "cursor": {}
+}
+```
+
+### 13. Find the top 10 genres that appear most frequently in Highly Rated Anime (Rating >= 8.0)
+*Original: Find the top 10 actors who have appeared in the highest number of movies produced in India*
+```json
+{
+  "aggregate": "series",
+  "pipeline": [
+    { "$match": { "rating": { "$gte": 8.0 } } },
+    { "$project": { "genres": { "$split": ["$genre", ", "] } } },
+    { "$unwind": "$genres" },
+    { "$group": { "_id": "$genres", "total_highly_rated": { "$sum": 1 } } },
+    { "$sort": { "total_highly_rated": -1 } },
+    { "$limit": 10 },
+    { "$project": { "_id": 0, "genre": "$_id", "total_highly_rated": 1 } }
+  ],
+  "cursor": {}
+}
+```
+
+### 14. Categorize Anime as "Masterpiece", "Good", or "Average" Based on Rating
+*Original: Categorize Content as Good or Bad Based on Description*
+```json
+{
+  "aggregate": "series",
+  "pipeline": [
+    {
+      "$project": {
+        "_id": 0,
+        "name": 1,
+        "rating": 1,
+        "category": {
+          "$switch": {
+            "branches": [
+              { "case": { "$gte": ["$rating", 9.0] }, "then": "Masterpiece" },
+              { "case": { "$gte": ["$rating", 7.5] }, "then": "Good" }
+            ],
+            "default": "Average"
+          }
+        }
+      }
+    },
+    { "$sort": { "rating": -1 } },
+    { "$limit": 20 }
+  ],
+  "cursor": {}
+}
+```

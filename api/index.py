@@ -96,9 +96,9 @@ def execute_sql(request: QueryRequest):
     if "limit" not in query_str.lower():
         query_str = f"SELECT * FROM ({query_str}) AS subquery LIMIT 100"
 
-    database_uri = os.environ.get("SUPABASE_DB_URL")
+    database_uri = os.environ.get("DATABASE_URL")
     if not database_uri:
-        raise HTTPException(status_code=500, detail="Server configuration error: SUPABASE_DB_URL missing.")
+        raise HTTPException(status_code=500, detail="Server configuration error: DATABASE_URL missing.")
 
     try:
         # We use psycopg2 directly (synchronously)

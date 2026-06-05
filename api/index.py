@@ -45,7 +45,7 @@ def execute_mongo(request: QueryRequest):
             )
 
     if "find" in command_dict and "limit" not in command_dict:
-        command_dict["limit"] = 100
+        command_dict["limit"] = 500
 
     mongodb_uri = os.environ.get("MONGODB_URI")
     if not mongodb_uri:
@@ -96,7 +96,7 @@ def execute_sql(request: QueryRequest):
     if "limit" not in query_str.lower():
         # Strip any trailing semicolons before wrapping in a subquery
         clean_query = query_str.rstrip(";")
-        query_str = f"SELECT * FROM ({clean_query}) AS subquery LIMIT 100"
+        query_str = f"SELECT * FROM ({clean_query}) AS subquery LIMIT 500"
 
     database_uri = os.environ.get("DATABASE_URL")
     if not database_uri:
